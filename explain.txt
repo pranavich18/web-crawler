@@ -1,0 +1,59 @@
+Overall Workflow
+Before running the crawler make sure redis server is running on your local machine.
+
+Entry Point : "main.py"
+
+First of all we delete any already existing log files by doing a reex match for *log*.txt files. Then we move on to the following 2 modes.
+
+1.  Evaluation Mode (e)- 2 output logs, each listing all pages crawled by
+                         your crawler for one run from a different set of
+                         seeds. Try to crawl at least 5000 pages for each, 
+                         more if you can and less if you cannot.
+
+   command: python3 main.py --num_thread 200 --mode e  
+
+In this mode we run 2 bfs parallely on 2 seed url sets by randomly picking 20 urls from each seed file(contains 20 urls).
+
+2. Query Mode (q) - 1 output log for a given query which fetched top 20 search results
+                    and start with them as the seed urls and then run bfs
+
+    command: python3 main.py --num_thread 200 --mode q --query "BigApple"
+
+In this mode we use the "search.py" file which in turn uses the ddgs library (DuckDuckGo search engine), 
+this library helps us to get the to 20 search results for the given query. These 20 results are the seed url set for our bfs in this mode.
+
+After that depending upon the modes bfs () function is called. which takes us to bfs.py
+
+Crawling Phase: "bfs.py"
+
+Here the bfs function creates worker threads that start with the priority queue containing the seed URLs and crawl breadth wise.
+The worker function handles a lot of functionalities. It uses a redis cache memory to check for the visited set of urls.
+our bfs only works if we encounter a new url.
+During processing of each URL we maintain the count of pages of their super-domain and their depth to calculate 
+their score for Priority Queue. Score = log(depth)*log(#pages)
+
+Now once the url is okay to process, we clean and normalize the url using the functionalities from "crawler.py"
+
+"crawler.py" provides helper functions like 
+canWeCrawl() - to check if the url contains any blocked extensions like .png or .threads
+is_valid_mime() - to do mime checking for "text/html", "application/xhtml+xml" type of webpages
+clean_url() - to normalize the url by removing fragments, empty '/' and making the protocol scheme lowercase, etc.
+
+It also provides us with the class - URLParser which is derived from HTMLParser and helps in parsing hyperlinks from wepages that we crawl.
+
+The bfs function's stopping point can be configured by changing the "max_depth" parameter in "main.py", for now it is hardcoded 
+to value = 100, this gives us a very long time to run the crawler without interruptions to test it.
+
+The bfs function logs the urls crawled in the log files generated.
+if mode=e
+logs -> crawl_log1.txt, crawl_log2.txt
+
+if mode=q
+logs-> crawl_log_query.txt
+
+After every 20 urls crawled the stats for crawling are also logged like for eg:
+At time - 2025-10-01 18:46:50	Total pages crawled approx.- 1500	Total Bytes of Data approx.- 314870123 Bytes	Total Errors faced for pages approx.-246
+
+Exceptions are handled very well and logged in the terminal rather than the log files.
+For checking errors/exceptions explicitly one needs to see the command line output logs.
+To abruptly stop the crawler a person can use ^ + C (ctrl+c).
